@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adapter Pattern — Weather Aggregator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --card: #111318;
+    --border: #1e2230;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #a78bfa;
+    --green: #22c55e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --json-color: #00e5ff;
+    --txt-color: #ff6b35;
+    --xml-color: #a78bfa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .badge {
+    display: inline-block;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 6px 16px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+
+  /* Pattern diagram */
+  .diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    margin-bottom: 40px;
+    overflow-x: auto;
+  }
+
+  .diagram-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .flow-box {
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .flow-client { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: var(--green); }
+  .flow-interface { background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.4); color: var(--accent); }
+  .flow-adapters { display: flex; flex-direction: column; gap: 6px; }
+  .flow-adapter-json { background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.3); color: var(--json-color); font-size: 12px; padding: 7px 14px; border-radius: 4px; }
+  .flow-adapter-txt  { background: rgba(255,107,53,0.08); border: 1px solid rgba(255,107,53,0.3); color: var(--txt-color); font-size: 12px; padding: 7px 14px; border-radius: 4px; }
+  .flow-adapter-xml  { background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.3); color: var(--xml-color); font-size: 12px; padding: 7px 14px; border-radius: 4px; }
+  .flow-services { display: flex; flex-direction: column; gap: 6px; }
+  .flow-svc { background: rgba(100,116,139,0.1); border: 1px solid var(--border); color: var(--muted); font-size: 11px; padding: 7px 14px; border-radius: 4px; }
+
+  .arrow {
+    color: var(--muted);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .control-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+
+  .city-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .city-btn:hover, .city-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.06);
+  }
+
+  .run-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 28px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    margin-left: auto;
+  }
+
+  .run-btn:hover { background: #33ecff; transform: translateY(-1px); }
+  .run-btn:active { transform: translateY(0); }
+
+  /* Results grid */
+  .results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .result-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .card-header {
+    padding: 14px 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-header .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .card-json .card-header { background: rgba(0,229,255,0.08); border-bottom: 1px solid rgba(0,229,255,0.2); color: var(--json-color); }
+  .card-json .dot { background: var(--json-color); }
+  .card-txt  .card-header { background: rgba(255,107,53,0.08); border-bottom: 1px solid rgba(255,107,53,0.2); color: var(--txt-color); }
+  .card-txt  .dot { background: var(--txt-color); }
+  .card-xml  .card-header { background: rgba(167,139,250,0.08); border-bottom: 1px solid rgba(167,139,250,0.2); color: var(--xml-color); }
+  .card-xml  .dot { background: var(--xml-color); }
+
+  .card-body { padding: 20px; }
+
+  .raw-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .raw-data {
+    background: #0d0f14;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    word-break: break-all;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    min-height: 60px;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .output-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .output-row:last-child { border-bottom: none; }
+
+  .out-label { font-size: 11px; color: var(--muted); }
+  .out-value { font-size: 14px; font-weight: 600; }
+
+  .temp-value { color: var(--green); font-size: 22px; }
+
+  /* Code section */
+  .code-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .code-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .code-tab {
+    padding: 12px 20px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .code-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .code-tab:hover:not(.active) { color: var(--text); }
+
+  .code-pane { display: none; padding: 24px; overflow-x: auto; }
+  .code-pane.active { display: block; }
+
+  pre {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #94a3b8;
+    white-space: pre;
+  }
+
+  .kw { color: #7dd3fc; }
+  .cls { color: #fbbf24; }
+  .fn { color: #a78bfa; }
+  .str { color: #86efac; }
+  .cm { color: #475569; font-style: italic; }
+  .acc { color: var(--accent); }
+
+  /* Footer note */
+  .note {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    line-height: 1.8;
+  }
+
+  .note strong { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    .flow { flex-direction: column; }
+    .arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">GoF Structural Pattern</div>
+    <h1>🔌 The <span>Adapter</span> Pattern</h1>
+    <p class="subtitle">Weather Aggregator — 3 incompatible APIs, 1 clean interface</p>
+  </div>
+
+  <!-- Flow Diagram -->
+  <div class="diagram">
+    <div class="diagram-title">▸ Pattern Architecture</div>
+    <div class="flow">
+      <div class="flow-box flow-client">Client<br><span style="font-size:10px;opacity:0.7">main.py</span></div>
+      <div class="arrow">→</div>
+      <div class="flow-box flow-interface">«interface»<br>WeatherProvider<br><span style="font-size:10px;opacity:0.7">get_temperature()</span></div>
+      <div class="arrow">→</div>
+      <div class="flow-adapters">
+        <div class="flow-adapter-json">OpenWeatherAdapter</div>
+        <div class="flow-adapter-txt">WttrInAdapter</div>
+        <div class="flow-adapter-xml">XMLWeatherAdapter</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-services">
+        <div class="flow-svc">JSON / Kelvin API</div>
+        <div class="flow-svc">Plain Text API</div>
+        <div class="flow-svc">Legacy XML API</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <span class="control-label">City:</span>
+    <button class="city-btn active" onclick="selectCity(this, 'Chennai')">Chennai</button>
+    <button class="city-btn" onclick="selectCity(this, 'Mumbai')">Mumbai</button>
+    <button class="city-btn" onclick="selectCity(this, 'Delhi')">Delhi</button>
+    <button class="city-btn" onclick="selectCity(this, 'Bangalore')">Bangalore</button>
+    <button class="run-btn" onclick="runAdapters()">▶ RUN ADAPTERS</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results"></div>
+
+  <!-- Code Tabs -->
+  <div class="code-section">
+    <div class="code-tabs">
+      <button class="code-tab active" onclick="showTab(this,'tab-adapter')">adapters.py</button>
+      <button class="code-tab" onclick="showTab(this,'tab-interface')">weather_provider.py</button>
+      <button class="code-tab" onclick="showTab(this,'tab-services')">services.py</button>
+      <button class="code-tab" onclick="showTab(this,'tab-main')">main.py</button>
+    </div>
+
+    <div class="code-pane active" id="tab-adapter">
+<pre><span class="cm"># adapters.py — The heart of the pattern</span>
+
+<span class="kw">from</span> weather_provider <span class="kw">import</span> WeatherProvider
+<span class="kw">from</span> services <span class="kw">import</span> OpenWeatherMapAPI, WttrInAPI, WeatherXMLService
+
+<span class="kw">class</span> <span class="cls">OpenWeatherAdapter</span>(WeatherProvider):
+    <span class="cm">"""Adapts JSON/Kelvin API → WeatherProvider interface"""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self._api = <span class="cls">OpenWeatherMapAPI</span>()   <span class="cm"># Wraps the incompatible service</span>
+
+    <span class="kw">def</span> <span class="fn">get_temperature</span>(self, city):
+        data = self._api.<span class="fn">fetch_data</span>(city)
+        kelvin = data[<span class="str">"main"</span>][<span class="str">"temp"</span>]
+        <span class="kw">return</span> kelvin - <span class="acc">273.15</span>             <span class="cm"># ADAPTATION: Kelvin → Celsius</span>
+
+<span class="kw">class</span> <span class="cls">WttrInAdapter</span>(WeatherProvider):
+    <span class="cm">"""Adapts plain text API → WeatherProvider interface"""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self._api = <span class="cls">WttrInAPI</span>()
+
+    <span class="kw">def</span> <span class="fn">get_temperature</span>(self, city):
+        raw = self._api.<span class="fn">get_weather_string</span>(city)
+        <span class="cm"># "Weather in Chennai: +35C, ..." → 35.0</span>
+        <span class="kw">return</span> <span class="fn">float</span>(raw.split(<span class="str">"+"</span>)[1].split(<span class="str">"C"</span>)[0])
+
+<span class="kw">class</span> <span class="cls">XMLWeatherAdapter</span>(WeatherProvider):
+    <span class="cm">"""Adapts XML string API → WeatherProvider interface"""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self._api = <span class="cls">WeatherXMLService</span>()
+
+    <span class="kw">def</span> <span class="fn">get_temperature</span>(self, city):
+        xml_str = self._api.<span class="fn">get_xml_data</span>(city)
+        root = ET.<span class="fn">fromstring</span>(xml_str)       <span class="cm"># ADAPTATION: Parse XML</span>
+        <span class="kw">return</span> <span class="fn">float</span>(root.find(<span class="str">"temp_celsius"</span>).text)</pre>
+    </div>
+
+    <div class="code-pane" id="tab-interface">
+<pre><span class="cm"># weather_provider.py — The Target Interface</span>
+<span class="cm"># All adapters MUST implement this contract</span>
+
+<span class="kw">from</span> abc <span class="kw">import</span> ABC, abstractmethod
+
+<span class="kw">class</span> <span class="cls">WeatherProvider</span>(ABC):
+
+    <span class="acc">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">get_temperature</span>(self, city: str) -> float:
+        <span class="str">"""Return temperature in Celsius."""</span>
+        <span class="kw">pass</span>
+
+    <span class="acc">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">get_description</span>(self, city: str) -> str:
+        <span class="str">"""Return a short weather description."""</span>
+        <span class="kw">pass</span>
+
+    <span class="acc">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">get_source_name</span>(self) -> str:
+        <span class="str">"""Return the name of the data source."""</span>
+        <span class="kw">pass</span></pre>
+    </div>
+
+    <div class="code-pane" id="tab-services">
+<pre><span class="cm"># services.py — Incompatible legacy/3rd-party services</span>
+<span class="cm"># We CANNOT change these classes!</span>
+
+<span class="kw">class</span> <span class="cls">OpenWeatherMapAPI</span>:
+    <span class="cm">"""Returns nested dict with temp in KELVIN"""</span>
+    <span class="kw">def</span> <span class="fn">fetch_data</span>(self, city):
+        <span class="kw">return</span> {<span class="str">"main"</span>: {<span class="str">"temp"</span>: <span class="acc">308.15</span>},
+                <span class="str">"weather"</span>: [{<span class="str">"description"</span>: <span class="str">"hot and humid"</span>}]}
+
+<span class="kw">class</span> <span class="cls">WttrInAPI</span>:
+    <span class="cm">"""Returns plain TEXT string"""</span>
+    <span class="kw">def</span> <span class="fn">get_weather_string</span>(self, city):
+        <span class="kw">return</span> <span class="str">f"Weather in {city}: +35C, Condition: hot"</span>
+
+<span class="kw">class</span> <span class="cls">WeatherXMLService</span>:
+    <span class="cm">"""Returns raw XML string (legacy!)"""</span>
+    <span class="kw">def</span> <span class="fn">get_xml_data</span>(self, city):
+        <span class="kw">return</span> <span class="str">f"&lt;weather&gt;&lt;temp_celsius&gt;35&lt;/temp_celsius&gt;&lt;/weather&gt;"</span></pre>
+    </div>
+
+    <div class="code-pane" id="tab-main">
+<pre><span class="cm"># main.py — Client code</span>
+<span class="cm"># Uses ONLY the WeatherProvider interface.</span>
+<span class="cm"># Has NO idea what format each adapter handles!</span>
+
+<span class="kw">from</span> adapters <span class="kw">import</span> OpenWeatherAdapter, WttrInAdapter, XMLWeatherAdapter
+
+<span class="kw">def</span> <span class="fn">display_weather</span>(provider: <span class="cls">WeatherProvider</span>, city: str):
+    temp  = provider.<span class="fn">get_temperature</span>(city)
+    desc  = provider.<span class="fn">get_description</span>(city)
+    <span class="fn">print</span>(<span class="str">f"  🌡  {city}: {temp}°C — {desc}"</span>)
+
+providers = [
+    <span class="cls">OpenWeatherAdapter</span>(),   <span class="cm"># JSON / Kelvin</span>
+    <span class="cls">WttrInAdapter</span>(),         <span class="cm"># Plain text</span>
+    <span class="cls">XMLWeatherAdapter</span>(),     <span class="cm"># Legacy XML</span>
+]
+
+<span class="kw">for</span> provider <span class="kw">in</span> providers:
+    <span class="cm"># Same function call — different source every time!</span>
+    <span class="fn">display_weather</span>(provider, <span class="str">"Chennai"</span>)</pre>
+    </div>
+  </div>
+
+  <!-- Footer note -->
+  <div class="note">
+    <strong>Key Insight for Viva:</strong> The client (<code>main.py</code>) calls the exact same method on all 3 providers.<br>
+    Behind the scenes, each adapter speaks a different language — <strong>JSON, plain text, XML</strong>.<br>
+    The client never knows. That's the entire point of the Adapter Pattern.
+  </div>
+
+</div>
+
+<script>
+  const data = {
+    Chennai:   { temp: 35, desc: "hot and humid" },
+    Mumbai:    { temp: 32, desc: "partly cloudy" },
+    Delhi:     { temp: 39, desc: "very hot" },
+    Bangalore: { temp: 22, desc: "pleasant" },
+  };
+
+  let selectedCity = "Chennai";
+
+  function selectCity(btn, city) {
+    document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCity = city;
+  }
+
+  function runAdapters() {
+    const city = selectedCity;
+    const d = data[city];
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+
+    const adapters = [
+      {
+        cls: 'card-json',
+        name: 'OpenWeatherAdapter',
+        source: 'OpenWeatherMap API',
+        rawLabel: 'Raw Input (JSON / Kelvin)',
+        raw: `{"main": {"temp": ${d.temp + 273.15}},\n "weather": [{"description": "${d.desc}"}]}`,
+        adaptation: 'Kelvin → Celsius: ' + (d.temp + 273.15) + ' - 273.15 = ' + d.temp,
+        temp: d.temp,
+        desc: d.desc,
+      },
+      {
+        cls: 'card-txt',
+        name: 'WttrInAdapter',
+        source: 'wttr.in API',
+        rawLabel: 'Raw Input (Plain Text)',
+        raw: `Weather in ${city}: +${d.temp}C, Condition: ${d.desc}`,
+        adaptation: 'Parsed: split("+")[1].split("C")[0] → ' + d.temp,
+        temp: d.temp,
+        desc: d.desc,
+      },
+      {
+        cls: 'card-xml',
+        name: 'XMLWeatherAdapter',
+        source: 'Legacy XML Service',
+        rawLabel: 'Raw Input (XML)',
+        raw: `<weather>\n  <city>${city}</city>\n  <temp_celsius>${d.temp}</temp_celsius>\n  <desc>${d.desc}</desc>\n</weather>`,
+        adaptation: 'ET.fromstring(xml).find("temp_celsius").text',
+        temp: d.temp,
+        desc: d.desc,
+      }
+    ];
+
+    adapters.forEach((a, i) => {
+      const card = document.createElement('div');
+      card.className = `result-card ${a.cls}`;
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="dot"></span>
+          ${a.name}
+        </div>
+        <div class="card-body">
+          <div class="raw-label">${a.rawLabel}</div>
+          <div class="raw-data">${a.raw}</div>
+          <div class="divider">🔌 adapter translates</div>
+          <div class="output-row">
+            <span class="out-label">Temperature</span>
+            <span class="out-value temp-value">${a.temp}°C</span>
+          </div>
+          <div class="output-row">
+            <span class="out-label">Condition</span>
+            <span class="out-value" style="font-size:13px">${a.desc}</span>
+          </div>
+          <div class="output-row">
+            <span class="out-label">Source</span>
+            <span class="out-value" style="font-size:11px;color:var(--muted)">${a.source}</span>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+      setTimeout(() => card.classList.add('visible'), 80 * i);
+    });
+  }
+
+  function showTab(btn, id) {
+    document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.code-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(id).classList.add('active');
+  }
+
+  // Auto-run on load
+  runAdapters();
+</script>
+</body>
+</html>
